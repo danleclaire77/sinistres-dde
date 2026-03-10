@@ -1,0 +1,1311 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dégâts des Eaux — Gestionnaire de Sinistres</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700;900&family=DM+Sans:ital,wght@0,300;0,400;0,500;0,600;1,400&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --navy: #0f1923;
+    --navy-mid: #162030;
+    --navy-light: #1e2d40;
+    --teal: #00b4a0;
+    --teal-dark: #008a78;
+    --teal-glow: rgba(0,180,160,0.12);
+    --amber: #f59e0b;
+    --red: #ef4444;
+    --green: #22c55e;
+    --blue: #3b82f6;
+    --text: #e2eaf3;
+    --text-muted: #7a95b0;
+    --border: rgba(255,255,255,0.07);
+    --card: rgba(255,255,255,0.04);
+    --card-hover: rgba(255,255,255,0.07);
+    --shadow: 0 4px 24px rgba(0,0,0,0.4);
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  html { scroll-behavior: smooth; }
+
+  body {
+    font-family: 'DM Sans', sans-serif;
+    background: var(--navy);
+    color: var(--text);
+    min-height: 100vh;
+  }
+  body::before {
+    content:''; position:fixed; inset:0; pointer-events:none;
+    background: radial-gradient(ellipse 80% 60% at 5% 0%, rgba(0,180,160,0.07) 0%, transparent 60%),
+                radial-gradient(ellipse 50% 50% at 95% 100%, rgba(0,80,120,0.06) 0%, transparent 60%);
+  }
+
+  /* LOADER */
+  #loader {
+    position: fixed; inset: 0; background: var(--navy);
+    display: flex; align-items: center; justify-content: center;
+    z-index: 9999; transition: opacity 0.4s;
+  }
+  .loader-inner { text-align: center; }
+  .loader-wave { font-size: 48px; animation: wave 1.2s ease-in-out infinite; }
+  @keyframes wave { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-12px); } }
+  .loader-text { font-family: 'Playfair Display', serif; font-size: 20px; margin-top: 16px; color: var(--teal); }
+
+  /* HEADER */
+  header {
+    padding: 0 32px; height: 64px;
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: space-between;
+    background: rgba(15,25,35,0.95); backdrop-filter: blur(16px);
+    position: sticky; top: 0; z-index: 100;
+  }
+  .logo { display: flex; align-items: center; gap: 12px; cursor: pointer; }
+  .logo-icon {
+    width: 38px; height: 38px; border-radius: 9px;
+    background: linear-gradient(135deg, var(--teal), #007a8a);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 20px; box-shadow: 0 0 20px rgba(0,180,160,0.3);
+  }
+  .logo-name { font-family: 'Playfair Display', serif; font-size: 17px; font-weight: 700; }
+  .logo-sub { font-size: 10px; color: var(--text-muted); font-family: 'DM Mono', monospace; letter-spacing: 0.1em; text-transform: uppercase; }
+
+  .header-center { display: flex; gap: 4px; }
+  .nav-btn {
+    padding: 7px 16px; border-radius: 6px; border: none; cursor: pointer;
+    font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 500;
+    background: transparent; color: var(--text-muted); transition: all 0.15s;
+    position: relative;
+  }
+  .nav-btn:hover { color: var(--text); background: var(--card); }
+  .nav-btn.active { color: var(--teal); background: var(--teal-glow); }
+  .nav-badge {
+    position: absolute; top: 2px; right: 4px;
+    background: var(--red); color: white;
+    font-size: 9px; font-weight: 700; padding: 1px 5px; border-radius: 8px;
+    font-family: 'DM Mono', monospace;
+  }
+
+  .header-right { display: flex; gap: 8px; align-items: center; }
+
+  /* BUTTONS */
+  .btn {
+    padding: 8px 18px; border-radius: 7px; border: none; cursor: pointer;
+    font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 500;
+    transition: all 0.2s; display: inline-flex; align-items: center; gap: 6px;
+    text-decoration: none;
+  }
+  .btn-primary { background: var(--teal); color: var(--navy); }
+  .btn-primary:hover { background: #00c9b3; transform: translateY(-1px); box-shadow: 0 4px 14px rgba(0,180,160,0.3); }
+  .btn-ghost { background: transparent; color: var(--text-muted); border: 1px solid var(--border); }
+  .btn-ghost:hover { border-color: rgba(0,180,160,0.4); color: var(--teal); }
+  .btn-danger { background: rgba(239,68,68,0.12); color: var(--red); border: 1px solid rgba(239,68,68,0.25); }
+  .btn-danger:hover { background: rgba(239,68,68,0.22); }
+  .btn-sm { padding: 5px 12px; font-size: 12px; }
+  .btn-xs { padding: 3px 9px; font-size: 11px; }
+
+  /* LAYOUT */
+  .app { display: flex; min-height: calc(100vh - 64px); }
+
+  /* SIDEBAR */
+  .sidebar {
+    width: 230px; flex-shrink: 0;
+    border-right: 1px solid var(--border);
+    background: var(--navy-mid);
+    padding: 20px 0;
+    display: flex; flex-direction: column;
+  }
+  .sidebar-group { margin-bottom: 4px; }
+  .sidebar-group-label {
+    font-size: 9px; font-weight: 700; letter-spacing: 0.14em;
+    text-transform: uppercase; color: var(--text-muted);
+    padding: 10px 18px 5px;
+  }
+  .sidebar-link {
+    display: flex; align-items: center; gap: 9px;
+    padding: 9px 18px; cursor: pointer;
+    font-size: 13px; color: var(--text-muted);
+    transition: all 0.13s; border-left: 2px solid transparent;
+    user-select: none;
+  }
+  .sidebar-link:hover { color: var(--text); background: rgba(255,255,255,0.03); }
+  .sidebar-link.active { color: var(--teal); border-left-color: var(--teal); background: var(--teal-glow); }
+  .sidebar-link .icon { font-size: 15px; width: 18px; text-align: center; }
+  .sidebar-count {
+    margin-left: auto; font-family: 'DM Mono', monospace; font-size: 10px;
+    background: rgba(255,255,255,0.08); color: var(--text-muted);
+    padding: 1px 7px; border-radius: 10px;
+  }
+  .sidebar-count.urgent { background: rgba(239,68,68,0.2); color: var(--red); }
+  .sidebar-count.active-count { background: rgba(0,180,160,0.15); color: var(--teal); }
+  .sidebar-divider { height: 1px; background: var(--border); margin: 10px 18px; }
+
+  /* MAIN */
+  .main { flex: 1; overflow-y: auto; padding: 28px 32px; }
+
+  /* VIEWS */
+  .view { display: none; animation: fadeIn 0.2s ease; }
+  .view.active { display: block; }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+
+  /* PAGE TITLE */
+  .page-header { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 24px; }
+  .page-title { font-family: 'Playfair Display', serif; font-size: 26px; font-weight: 700; }
+  .page-sub { color: var(--text-muted); font-size: 13px; margin-top: 3px; }
+
+  /* STAT CARDS */
+  .stats-row { display: grid; grid-template-columns: repeat(4,1fr); gap: 14px; margin-bottom: 24px; }
+  .stat {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: 10px; padding: 16px 18px;
+    transition: border-color 0.2s;
+  }
+  .stat:hover { border-color: rgba(0,180,160,0.2); }
+  .stat-label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.09em; color: var(--text-muted); margin-bottom: 8px; font-weight: 600; }
+  .stat-num { font-family: 'Playfair Display', serif; font-size: 36px; font-weight: 700; line-height: 1; }
+  .stat-detail { font-size: 11px; color: var(--text-muted); margin-top: 5px; }
+  .c-teal { color: var(--teal); }
+  .c-red { color: var(--red); }
+  .c-amber { color: var(--amber); }
+  .c-green { color: var(--green); }
+  .c-blue { color: var(--blue); }
+
+  /* CARD */
+  .card {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: 10px; overflow: hidden; margin-bottom: 16px;
+  }
+  .card-head {
+    padding: 14px 18px; border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .card-title { font-size: 14px; font-weight: 600; }
+  .card-body { padding: 18px; }
+
+  /* SINISTRE ROW */
+  .sin-row {
+    display: grid;
+    grid-template-columns: 80px 1fr 140px 90px 110px 60px;
+    align-items: center; gap: 14px;
+    padding: 14px 18px; border-bottom: 1px solid var(--border);
+    cursor: pointer; transition: background 0.13s;
+  }
+  .sin-row:last-child { border-bottom: none; }
+  .sin-row:hover { background: var(--card-hover); }
+  .sin-id { font-family: 'DM Mono', monospace; font-size: 10px; color: var(--teal); }
+  .sin-title { font-weight: 500; font-size: 14px; }
+  .sin-desc { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+  .sin-date { font-size: 12px; color: var(--text-muted); }
+
+  /* STATUS */
+  .status {
+    display: inline-flex; align-items: center; gap: 5px;
+    padding: 3px 10px; border-radius: 20px;
+    font-size: 11px; font-weight: 600; white-space: nowrap;
+  }
+  .status::before { content:''; width:6px; height:6px; border-radius:50%; }
+  .st-ouvert { background: rgba(59,130,246,0.12); color: #60a5fa; }
+  .st-ouvert::before { background: #60a5fa; }
+  .st-en-cours { background: rgba(245,158,11,0.12); color: var(--amber); }
+  .st-en-cours::before { background: var(--amber); animation: blink 1.5s infinite; }
+  .st-bloque { background: rgba(239,68,68,0.12); color: var(--red); }
+  .st-bloque::before { background: var(--red); animation: blink 0.9s infinite; }
+  .st-cloture { background: rgba(34,197,94,0.12); color: var(--green); }
+  .st-cloture::before { background: var(--green); }
+  @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.2} }
+
+  /* FILTERS */
+  .filter-row { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; align-items: center; }
+  .chip {
+    padding: 5px 13px; border-radius: 18px; font-size: 12px; font-weight: 500;
+    border: 1px solid var(--border); background: transparent;
+    color: var(--text-muted); cursor: pointer; transition: all 0.13s;
+  }
+  .chip:hover { border-color: var(--teal); color: var(--teal); }
+  .chip.on { background: var(--teal); border-color: var(--teal); color: var(--navy); }
+  .search-box {
+    padding: 7px 13px; border-radius: 7px; font-size: 13px;
+    background: var(--card); border: 1px solid var(--border);
+    color: var(--text); font-family: 'DM Sans', sans-serif;
+    outline: none; width: 200px; transition: border-color 0.15s;
+  }
+  .search-box:focus { border-color: var(--teal); }
+
+  /* DETAIL */
+  .detail-layout { display: grid; grid-template-columns: 1fr 310px; gap: 18px; }
+  .tabs { display: flex; border-bottom: 1px solid var(--border); margin-bottom: 18px; gap: 0; }
+  .tab {
+    padding: 9px 18px; font-size: 13px; cursor: pointer;
+    color: var(--text-muted); border-bottom: 2px solid transparent;
+    transition: all 0.13s; margin-bottom: -1px;
+  }
+  .tab:hover { color: var(--text); }
+  .tab.active { color: var(--teal); border-bottom-color: var(--teal); }
+
+  /* ACTOR CARD */
+  .actor {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: 8px; padding: 14px; margin-bottom: 10px;
+    transition: border-color 0.15s;
+  }
+  .actor:hover { border-color: rgba(0,180,160,0.25); }
+  .actor-role { font-size: 10px; text-transform: uppercase; letter-spacing: 0.1em; font-weight: 700; margin-bottom: 5px; }
+  .actor-name { font-weight: 600; font-size: 14px; }
+  .actor-info { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
+  .actor-actions { display: flex; gap: 6px; margin-top: 10px; }
+
+  /* TIMELINE */
+  .tl { padding-left: 22px; position: relative; }
+  .tl::before { content:''; position:absolute; left:8px; top:0; bottom:0; width:1px; background:var(--border); }
+  .tl-item { position:relative; padding-bottom:16px; }
+  .tl-dot {
+    position:absolute; left:-18px; top:3px;
+    width:11px; height:11px; border-radius:50%;
+    background: var(--teal-dark); border:2px solid var(--teal);
+  }
+  .tl-dot.red { background:rgba(239,68,68,0.2); border-color:var(--red); }
+  .tl-dot.amber { background:rgba(245,158,11,0.2); border-color:var(--amber); }
+  .tl-date { font-size:10px; color:var(--text-muted); font-family:'DM Mono',monospace; }
+  .tl-text { font-size:13px; margin-top:2px; line-height:1.5; }
+
+  /* RELANCE ITEM */
+  .relance {
+    display: flex; align-items: flex-start; gap: 11px;
+    padding: 12px; background: var(--card);
+    border: 1px solid var(--border); border-radius: 8px;
+    margin-bottom: 8px; cursor: pointer; transition: background 0.13s;
+  }
+  .relance:hover { background: var(--card-hover); }
+  .relance.urgent { border-color: rgba(239,68,68,0.35); background: rgba(239,68,68,0.04); }
+  .r-dot { width:8px; height:8px; border-radius:50%; flex-shrink:0; margin-top:5px; }
+  .r-meta { font-size:11px; color:var(--text-muted); display:flex; gap:10px; margin-top:4px; }
+
+  /* PROGRESS */
+  .progress { height:4px; background:var(--border); border-radius:2px; overflow:hidden; }
+  .progress-fill { height:100%; background:var(--teal); border-radius:2px; transition:width 0.5s ease; }
+
+  /* INFO BLOCKS */
+  .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .info-block {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: 8px; padding: 11px 13px;
+  }
+  .info-label { font-size: 10px; color: var(--text-muted); margin-bottom: 4px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; }
+  .info-val { font-size: 13px; font-weight: 500; }
+
+  /* MODELES */
+  .modeles-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 14px; }
+  .modele-card {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: 10px; padding: 20px; cursor: pointer;
+    transition: all 0.2s;
+  }
+  .modele-card:hover { border-color: rgba(0,180,160,0.35); transform: translateY(-2px); box-shadow: var(--shadow); }
+  .modele-icon { font-size: 28px; margin-bottom: 12px; }
+  .modele-title { font-weight: 600; font-size: 14px; margin-bottom: 5px; }
+  .modele-desc { font-size: 12px; color: var(--text-muted); margin-bottom: 14px; }
+
+  /* MODAL */
+  .overlay {
+    display: none; position: fixed; inset: 0;
+    background: rgba(0,0,0,0.65); backdrop-filter: blur(4px);
+    z-index: 1000; align-items: center; justify-content: center;
+  }
+  .overlay.open { display: flex; }
+  .modal {
+    background: var(--navy-mid); border: 1px solid var(--border);
+    border-radius: 14px; padding: 26px; width: 580px; max-width: 95vw;
+    max-height: 90vh; overflow-y: auto;
+    box-shadow: 0 24px 60px rgba(0,0,0,0.5);
+    animation: modalIn 0.22s ease;
+  }
+  @keyframes modalIn { from { transform: translateY(16px) scale(0.98); opacity:0; } to { transform: none; opacity:1; } }
+  .modal-title { font-family: 'Playfair Display', serif; font-size: 20px; font-weight: 700; margin-bottom: 20px; }
+  .modal-foot { display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px; }
+  .modal-close-btn {
+    position: absolute; right: 20px; top: 20px;
+    background: none; border: none; color: var(--text-muted); font-size: 22px; cursor: pointer;
+    transition: color 0.15s;
+  }
+  .modal-close-btn:hover { color: var(--text); }
+
+  /* FORMS */
+  .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 13px; }
+  .fg { display: flex; flex-direction: column; gap: 5px; }
+  .fg.full { grid-column: 1/-1; }
+  .fl { font-size: 11px; color: var(--text-muted); font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; }
+  .fi, .fs, .fta {
+    background: var(--navy-light); border: 1px solid var(--border);
+    border-radius: 7px; padding: 9px 12px;
+    color: var(--text); font-family: 'DM Sans', sans-serif; font-size: 13px;
+    outline: none; transition: border-color 0.15s;
+  }
+  .fi:focus, .fs:focus, .fta:focus { border-color: var(--teal); }
+  .fs { appearance: none; cursor: pointer; }
+  .fta { resize: vertical; min-height: 78px; }
+  option { background: var(--navy-light); }
+
+  /* ANNUAIRE */
+  .annuaire-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; }
+
+  /* EMPTY */
+  .empty { text-align: center; padding: 50px 20px; color: var(--text-muted); }
+  .empty-icon { font-size: 44px; opacity: 0.35; margin-bottom: 14px; }
+  .empty-text { font-size: 14px; }
+
+  /* TOAST */
+  #toast {
+    position: fixed; bottom: 24px; right: 24px;
+    background: var(--navy-light); border: 1px solid var(--border);
+    border-radius: 8px; padding: 12px 18px;
+    font-size: 13px; color: var(--text); z-index: 9000;
+    transform: translateY(20px); opacity: 0;
+    transition: all 0.3s; pointer-events: none;
+    box-shadow: var(--shadow);
+  }
+  #toast.show { transform: translateY(0); opacity: 1; }
+
+  /* SCROLLBAR */
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 3px; }
+
+  /* MOBILE */
+  @media (max-width: 900px) {
+    .sidebar { display: none; }
+    .header-center { display: none; }
+    .stats-row { grid-template-columns: repeat(2,1fr); }
+    .detail-layout { grid-template-columns: 1fr; }
+    .sin-row { grid-template-columns: 1fr; }
+  }
+
+  .sep { height: 1px; background: var(--border); margin: 16px 0; }
+  .tag { display:inline-block; padding:2px 8px; border-radius:4px; font-size:11px; font-weight:600; background:rgba(0,180,160,0.12); color:var(--teal); }
+  .spin { animation: spin 1s linear infinite; display:inline-block; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+</style>
+</head>
+<body>
+
+<!-- LOADER -->
+<div id="loader">
+  <div class="loader-inner">
+    <div class="loader-wave">💧</div>
+    <div class="loader-text">Chargement des sinistres…</div>
+  </div>
+</div>
+
+<!-- HEADER -->
+<header>
+  <div class="logo" onclick="showView('dashboard')">
+    <div class="logo-icon">💧</div>
+    <div>
+      <div class="logo-name">Sinistres — DDE</div>
+      <div class="logo-sub">SCI Grand Miroir · Quai Mullenheim</div>
+    </div>
+  </div>
+
+  <div class="header-center">
+    <button class="nav-btn active" id="nav-dashboard" onclick="showView('dashboard')">Tableau de bord</button>
+    <button class="nav-btn" id="nav-sinistres" onclick="showView('sinistres')">Sinistres</button>
+    <button class="nav-btn" id="nav-relances" onclick="showView('relances')">
+      Relances <span class="nav-badge" id="nb-relances" style="display:none">0</span>
+    </button>
+    <button class="nav-btn" id="nav-annuaire" onclick="showView('annuaire')">Annuaire</button>
+    <button class="nav-btn" id="nav-modeles" onclick="showView('modeles')">Modèles</button>
+  </div>
+
+  <div class="header-right">
+    <button class="btn btn-ghost btn-sm" onclick="exportData()">⬇ Export</button>
+    <button class="btn btn-primary" onclick="openNewSinistre()">+ Nouveau sinistre</button>
+  </div>
+</header>
+
+<div class="app">
+  <!-- SIDEBAR -->
+  <nav class="sidebar">
+    <div class="sidebar-group">
+      <div class="sidebar-group-label">Vues</div>
+      <div class="sidebar-link active" id="snav-dashboard" onclick="showView('dashboard')">
+        <span class="icon">🏠</span> Tableau de bord
+      </div>
+      <div class="sidebar-link" id="snav-sinistres" onclick="showView('sinistres')">
+        <span class="icon">📋</span> Tous les sinistres
+        <span class="sidebar-count active-count" id="sc-sinistres">0</span>
+      </div>
+      <div class="sidebar-link" id="snav-relances" onclick="showView('relances')">
+        <span class="icon">🔔</span> Relances
+        <span class="sidebar-count urgent" id="sc-relances" style="display:none">0</span>
+      </div>
+      <div class="sidebar-link" id="snav-annuaire" onclick="showView('annuaire')">
+        <span class="icon">👥</span> Annuaire
+      </div>
+      <div class="sidebar-link" id="snav-modeles" onclick="showView('modeles')">
+        <span class="icon">📄</span> Modèles courriers
+      </div>
+    </div>
+    <div class="sidebar-divider"></div>
+    <div class="sidebar-group">
+      <div class="sidebar-group-label">Propriétés</div>
+      <div class="sidebar-link" onclick="filterProp('Quai Mullenheim')"><span class="icon">🏢</span> Quai Mullenheim</div>
+      <div class="sidebar-link" onclick="filterProp('SCI Grand Miroir')"><span class="icon">🏠</span> SCI Grand Miroir</div>
+      <div class="sidebar-link" onclick="filterProp('Faubourg National')"><span class="icon">🏗</span> Faubourg National</div>
+      <div class="sidebar-link" onclick="filterProp('')"><span class="icon">📍</span> Toutes</div>
+    </div>
+  </nav>
+
+  <!-- MAIN -->
+  <main class="main" id="main">
+
+    <!-- DASHBOARD -->
+    <div class="view active" id="view-dashboard">
+      <div class="page-header">
+        <div>
+          <div class="page-title">Tableau de bord</div>
+          <div class="page-sub" id="dash-date"></div>
+        </div>
+        <button class="btn btn-ghost btn-sm" onclick="loadAll()">↻ Actualiser</button>
+      </div>
+      <div class="stats-row">
+        <div class="stat"><div class="stat-label">Sinistres actifs</div><div class="stat-num c-teal" id="d-actifs">—</div><div class="stat-detail">en cours de traitement</div></div>
+        <div class="stat"><div class="stat-label">Relances urgentes</div><div class="stat-num c-red" id="d-relances">—</div><div class="stat-detail">dans les 3 prochains jours</div></div>
+        <div class="stat"><div class="stat-label">En attente</div><div class="stat-num c-amber" id="d-attente">—</div><div class="stat-detail">assureurs / syndic / artisans</div></div>
+        <div class="stat"><div class="stat-label">Clôturés</div><div class="stat-num c-green" id="d-clotures">—</div><div class="stat-detail">cette année</div></div>
+      </div>
+      <div class="card" style="margin-bottom:16px;">
+        <div class="card-head"><span class="card-title">⚡ Actions urgentes</span><button class="btn btn-ghost btn-sm" onclick="showView('relances')">Tout voir</button></div>
+        <div id="d-urgent"></div>
+      </div>
+      <div class="card">
+        <div class="card-head"><span class="card-title">📋 Sinistres récents</span><button class="btn btn-ghost btn-sm" onclick="showView('sinistres')">Tous</button></div>
+        <div id="d-recent"></div>
+      </div>
+    </div>
+
+    <!-- SINISTRES LIST -->
+    <div class="view" id="view-sinistres">
+      <div class="page-header">
+        <div><div class="page-title">Sinistres</div><div class="page-sub">Tous vos dossiers dégâts des eaux</div></div>
+        <button class="btn btn-primary" onclick="openNewSinistre()">+ Nouveau sinistre</button>
+      </div>
+      <div class="filter-row">
+        <input class="search-box" type="text" placeholder="🔍 Rechercher…" oninput="renderList()" id="search">
+        <button class="chip on" onclick="setFilter('tous',this)">Tous</button>
+        <button class="chip" onclick="setFilter('ouvert',this)">Ouverts</button>
+        <button class="chip" onclick="setFilter('en-cours',this)">En cours</button>
+        <button class="chip" onclick="setFilter('bloque',this)">Bloqués</button>
+        <button class="chip" onclick="setFilter('cloture',this)">Clôturés</button>
+      </div>
+      <div class="card" id="list-card"><div id="sin-list"></div></div>
+    </div>
+
+    <!-- RELANCES -->
+    <div class="view" id="view-relances">
+      <div class="page-header">
+        <div><div class="page-title">Relances</div><div class="page-sub">Suivi de toutes vos relances planifiées</div></div>
+      </div>
+      <div id="relances-view"></div>
+    </div>
+
+    <!-- ANNUAIRE -->
+    <div class="view" id="view-annuaire">
+      <div class="page-header">
+        <div><div class="page-title">Annuaire</div><div class="page-sub">Tous les intervenants de vos sinistres</div></div>
+        <button class="btn btn-primary" onclick="openAddActeur(false)">+ Ajouter acteur</button>
+      </div>
+      <div class="annuaire-grid" id="annuaire-list"></div>
+    </div>
+
+    <!-- MODÈLES -->
+    <div class="view" id="view-modeles">
+      <div class="page-header">
+        <div><div class="page-title">Modèles de courriers</div><div class="page-sub">Lettres types à copier-coller ou adapter</div></div>
+      </div>
+      <div class="modeles-grid" id="modeles-list"></div>
+    </div>
+
+    <!-- DETAIL -->
+    <div class="view" id="view-detail">
+      <div class="page-header">
+        <div style="display:flex;align-items:center;gap:12px;">
+          <button class="btn btn-ghost btn-sm" onclick="showView('sinistres')">← Retour</button>
+          <div>
+            <div class="page-title" id="dt-title"></div>
+            <div class="page-sub" id="dt-sub"></div>
+          </div>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <span id="dt-status"></span>
+          <button class="btn btn-ghost btn-sm" onclick="openEditSinistre()">✏️ Modifier</button>
+          <button class="btn btn-danger btn-sm" onclick="deleteSinistre()">🗑</button>
+        </div>
+      </div>
+      <div class="detail-layout">
+        <div>
+          <div class="tabs">
+            <div class="tab active" onclick="showTab('ti',this)">Informations</div>
+            <div class="tab" onclick="showTab('ta',this)">Acteurs <span id="tc-a" style="color:var(--text-muted);font-size:11px;"></span></div>
+            <div class="tab" onclick="showTab('tt',this)">Historique</div>
+            <div class="tab" onclick="showTab('tr',this)">Relances</div>
+          </div>
+          <div id="tc-infos"></div>
+          <div id="tc-actors" style="display:none"></div>
+          <div id="tc-timeline" style="display:none"></div>
+          <div id="tc-relances" style="display:none"></div>
+        </div>
+        <div>
+          <div class="card" style="padding:16px;margin-bottom:14px;">
+            <div style="font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.1em;font-weight:700;margin-bottom:12px;">Avancement</div>
+            <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:7px;"><span>Progression</span><span id="prg-pct" class="c-teal">0%</span></div>
+            <div class="progress"><div class="progress-fill" id="prg-bar" style="width:0%"></div></div>
+            <div style="margin-top:13px;" id="prg-checklist"></div>
+          </div>
+          <div class="card" style="padding:16px;">
+            <div style="font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.1em;font-weight:700;margin-bottom:12px;">Résumé</div>
+            <div id="dt-summary"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<!-- TOAST -->
+<div id="toast"></div>
+
+<!-- MODAL SINISTRE -->
+<div class="overlay" id="m-sinistre">
+  <div class="modal" style="position:relative;">
+    <button class="modal-close-btn" onclick="close('m-sinistre')">×</button>
+    <div class="modal-title" id="ms-title">Nouveau sinistre</div>
+    <div class="form-grid">
+      <div class="fg"><label class="fl">Propriété *</label>
+        <select class="fs" id="ms-prop">
+          <option value="">Sélectionner…</option>
+          <option>Quai Mullenheim</option><option>SCI Grand Miroir</option>
+          <option>Faubourg National</option><option>Copropriété (autre)</option>
+        </select></div>
+      <div class="fg"><label class="fl">Appartement / Lot</label><input class="fi" id="ms-lot" placeholder="Ex: Appt 4B, 2ème étage"></div>
+      <div class="fg full"><label class="fl">Description *</label><textarea class="fta" id="ms-desc" placeholder="Fuite sous évier, infiltration plafond…"></textarea></div>
+      <div class="fg"><label class="fl">Date déclaration *</label><input type="date" class="fi" id="ms-date"></div>
+      <div class="fg"><label class="fl">Statut</label>
+        <select class="fs" id="ms-statut">
+          <option value="ouvert">Ouvert</option><option value="en-cours">En cours</option>
+          <option value="bloque">Bloqué</option><option value="cloture">Clôturé</option>
+        </select></div>
+      <div class="fg"><label class="fl">Origine</label>
+        <select class="fs" id="ms-origine">
+          <option value="">Indéterminée</option>
+          <option>Appartement du dessus</option><option>Parties communes</option>
+          <option>Toiture</option><option>Réseau collectif</option>
+          <option>Propre installation</option><option>Voisin latéral</option>
+        </select></div>
+      <div class="fg"><label class="fl">Responsabilité</label>
+        <select class="fs" id="ms-resp">
+          <option value="">À déterminer</option>
+          <option>Propriétaire responsable</option><option>Copropriété responsable</option>
+          <option>Locataire responsable</option><option>Tiers responsable</option><option>Partagée</option>
+        </select></div>
+      <div class="fg"><label class="fl">N° dossier assurance</label><input class="fi" id="ms-ndoss" placeholder="Optionnel"></div>
+      <div class="fg"><label class="fl">Montant estimé (€)</label><input type="number" class="fi" id="ms-montant" placeholder="0"></div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-ghost" onclick="close('m-sinistre')">Annuler</button>
+      <button class="btn btn-primary" onclick="saveSinistre()">Enregistrer</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL ACTEUR -->
+<div class="overlay" id="m-acteur">
+  <div class="modal" style="position:relative;">
+    <button class="modal-close-btn" onclick="close('m-acteur')">×</button>
+    <div class="modal-title">Ajouter un acteur</div>
+    <div class="form-grid">
+      <div class="fg"><label class="fl">Rôle *</label>
+        <select class="fs" id="ma-role">
+          <option value="">Sélectionner…</option>
+          <option>Assureur (victime)</option><option>Assureur (responsable)</option>
+          <option>Expert assurance</option><option>Syndic</option>
+          <option>Plombier / Artisan</option><option>Locataire victime</option>
+          <option>Locataire responsable</option><option>Voisin responsable</option>
+          <option>Voisin victime</option><option>Gestionnaire immobilier</option>
+          <option>Avocat</option><option>Huissier</option><option>Autre</option>
+        </select></div>
+      <div class="fg"><label class="fl">Nom / Société *</label><input class="fi" id="ma-nom" placeholder="Nom complet ou raison sociale"></div>
+      <div class="fg"><label class="fl">Prénom / Contact</label><input class="fi" id="ma-contact" placeholder="Interlocuteur principal"></div>
+      <div class="fg"><label class="fl">Téléphone</label><input type="tel" class="fi" id="ma-tel" placeholder="06 XX XX XX XX"></div>
+      <div class="fg full"><label class="fl">Email</label><input type="email" class="fi" id="ma-email" placeholder="email@exemple.fr"></div>
+      <div class="fg full"><label class="fl">Notes</label><textarea class="fta" id="ma-notes" placeholder="N° contrat, n° sinistre chez eux, remarques…"></textarea></div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-ghost" onclick="close('m-acteur')">Annuler</button>
+      <button class="btn btn-primary" onclick="saveActeur()">Ajouter</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL EVENT -->
+<div class="overlay" id="m-event">
+  <div class="modal" style="position:relative;max-width:440px;">
+    <button class="modal-close-btn" onclick="close('m-event')">×</button>
+    <div class="modal-title">Ajouter un événement</div>
+    <div class="form-grid">
+      <div class="fg"><label class="fl">Date *</label><input type="date" class="fi" id="me-date"></div>
+      <div class="fg"><label class="fl">Type</label>
+        <select class="fs" id="me-type">
+          <option value="info">Information</option><option value="relance">Relance effectuée</option>
+          <option value="blocage">Blocage</option><option value="avancement">Avancement</option>
+          <option value="expertise">Expertise</option><option value="paiement">Paiement</option>
+        </select></div>
+      <div class="fg full"><label class="fl">Description *</label><textarea class="fta" id="me-desc" placeholder="Décrivez l'événement…"></textarea></div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-ghost" onclick="close('m-event')">Annuler</button>
+      <button class="btn btn-primary" onclick="saveEvent()">Ajouter</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL RELANCE -->
+<div class="overlay" id="m-relance">
+  <div class="modal" style="position:relative;max-width:440px;">
+    <button class="modal-close-btn" onclick="close('m-relance')">×</button>
+    <div class="modal-title">Planifier une relance</div>
+    <div class="form-grid">
+      <div class="fg"><label class="fl">À relancer *</label><input class="fi" id="mr-acteur" placeholder="Nom de l'acteur"></div>
+      <div class="fg"><label class="fl">Date *</label><input type="date" class="fi" id="mr-date"></div>
+      <div class="fg"><label class="fl">Urgence</label>
+        <select class="fs" id="mr-urgence">
+          <option value="haute">🔴 Haute</option><option value="moyenne">🟡 Moyenne</option><option value="basse">🟢 Basse</option>
+        </select></div>
+      <div class="fg"><label class="fl">Moyen</label>
+        <select class="fs" id="mr-moyen">
+          <option>Téléphone</option><option>Email</option><option>Courrier recommandé</option><option>Visite</option>
+        </select></div>
+      <div class="fg full"><label class="fl">Objet / Note</label><textarea class="fta" id="mr-note" placeholder="Relancer pour obtenir…"></textarea></div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-ghost" onclick="close('m-relance')">Annuler</button>
+      <button class="btn btn-primary" onclick="saveRelance()">Planifier</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL MODELE -->
+<div class="overlay" id="m-modele">
+  <div class="modal" style="position:relative;max-width:640px;">
+    <button class="modal-close-btn" onclick="close('m-modele')">×</button>
+    <div class="modal-title" id="mm-title"></div>
+    <div style="background:var(--navy-light);border:1px solid var(--border);border-radius:8px;padding:16px;font-size:13px;line-height:1.8;white-space:pre-wrap;font-family:'DM Mono',monospace;color:var(--text);max-height:400px;overflow-y:auto;" id="mm-body"></div>
+    <div class="modal-foot">
+      <button class="btn btn-ghost" onclick="close('m-modele')">Fermer</button>
+      <button class="btn btn-primary" onclick="copyModele()">📋 Copier</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const API = '';
+let db = { sinistres: [] };
+let currentFilter = 'tous';
+let currentProp = '';
+let currentSinistreId = null;
+let editMode = false;
+let addActeurToSinistre = false;
+let currentModeleText = '';
+
+// ====== API ======
+async function api(method, path, body) {
+  const opts = { method, headers: { 'Content-Type': 'application/json' } };
+  if (body) opts.body = JSON.stringify(body);
+  const r = await fetch(API + '/api' + path, opts);
+  if (!r.ok) throw new Error(await r.text());
+  return r.json();
+}
+
+// ====== LOAD ======
+async function loadAll() {
+  try {
+    db.sinistres = await api('GET', '/sinistres');
+    updateBadges();
+    const view = document.querySelector('.view.active').id.replace('view-', '');
+    if (view === 'dashboard') renderDashboard();
+    else if (view === 'sinistres') renderList();
+    else if (view === 'relances') renderRelancesView();
+    else if (view === 'annuaire') renderAnnuaire();
+    else if (view === 'detail' && currentSinistreId) renderDetail(currentSinistreId);
+  } catch(e) { toast('Erreur de chargement: ' + e.message, true); }
+}
+
+// ====== VIEWS ======
+function showView(id) {
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  document.getElementById('view-' + id).classList.add('active');
+  document.querySelectorAll('.nav-btn, .sidebar-link').forEach(b => b.classList.remove('active'));
+  const nb = document.getElementById('nav-' + id);
+  const sn = document.getElementById('snav-' + id);
+  if (nb) nb.classList.add('active');
+  if (sn) sn.classList.add('active');
+  if (id === 'dashboard') renderDashboard();
+  else if (id === 'sinistres') renderList();
+  else if (id === 'relances') renderRelancesView();
+  else if (id === 'annuaire') renderAnnuaire();
+  else if (id === 'modeles') renderModeles();
+}
+
+function showTab(id, el) {
+  ['tc-infos','tc-actors','tc-timeline','tc-relances'].forEach(t => document.getElementById(t).style.display = 'none');
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  const map = { ti:'tc-infos', ta:'tc-actors', tt:'tc-timeline', tr:'tc-relances' };
+  document.getElementById(map[id]).style.display = 'block';
+  el.classList.add('active');
+}
+
+function open(id) { document.getElementById(id).classList.add('open'); }
+function close(id) { document.getElementById(id).classList.remove('open'); }
+document.querySelectorAll('.overlay').forEach(o => o.addEventListener('click', e => { if (e.target === o) o.classList.remove('open'); }));
+
+// ====== UTILS ======
+function today() { return new Date().toISOString().split('T')[0]; }
+function fd(d) { if (!d) return '—'; const [y,m,da] = d.split('-'); return `${da}/${m}/${y}`; }
+function daysDiff(d) { if (!d) return null; return Math.ceil((new Date(d) - new Date()) / 86400000); }
+function stLabel(s) { return { ouvert:'Ouvert', 'en-cours':'En cours', bloque:'Bloqué', cloture:'Clôturé' }[s] || s; }
+function stClass(s) { return { ouvert:'st-ouvert', 'en-cours':'st-en-cours', bloque:'st-bloque', cloture:'st-cloture' }[s] || ''; }
+function roleColor(r) {
+  const m = { 'Assureur (victime)':'#3b82f6','Assureur (responsable)':'#f59e0b','Expert assurance':'#8b5cf6','Syndic':'#06b6d4','Plombier / Artisan':'#10b981','Locataire victime':'#f472b6','Locataire responsable':'#ef4444','Voisin responsable':'#ef4444' };
+  return m[r] || '#7a95b0';
+}
+
+function toast(msg, err) {
+  const t = document.getElementById('toast');
+  t.textContent = (err ? '⚠️ ' : '✓ ') + msg;
+  t.style.borderColor = err ? 'rgba(239,68,68,0.3)' : 'rgba(0,180,160,0.3)';
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2800);
+}
+
+// ====== BADGES ======
+function updateBadges() {
+  const actifs = db.sinistres.filter(s => s.statut !== 'cloture').length;
+  document.getElementById('sc-sinistres').textContent = actifs;
+  const urg = [];
+  db.sinistres.forEach(s => (s.relances||[]).filter(r => !r.done && daysDiff(r.date) <= 3).forEach(r => urg.push(r)));
+  const sc = document.getElementById('sc-relances');
+  const nb = document.getElementById('nb-relances');
+  if (urg.length > 0) {
+    sc.textContent = urg.length; sc.style.display = 'inline';
+    nb.textContent = urg.length; nb.style.display = 'inline';
+  } else {
+    sc.style.display = 'none'; nb.style.display = 'none';
+  }
+}
+
+// ====== DASHBOARD ======
+function renderDashboard() {
+  document.getElementById('dash-date').textContent = new Date().toLocaleDateString('fr-FR', { weekday:'long', day:'numeric', month:'long', year:'numeric' });
+  const actifs = db.sinistres.filter(s => s.statut !== 'cloture').length;
+  const clotures = db.sinistres.filter(s => s.statut === 'cloture').length;
+  const attente = db.sinistres.filter(s => s.statut === 'en-cours').length;
+  const allRel = [];
+  db.sinistres.forEach(s => (s.relances||[]).filter(r => !r.done).forEach(r => allRel.push({ ...r, sin: s })));
+  const urgentes = allRel.filter(r => daysDiff(r.date) <= 3);
+
+  document.getElementById('d-actifs').textContent = actifs;
+  document.getElementById('d-relances').textContent = urgentes.length;
+  document.getElementById('d-attente').textContent = attente;
+  document.getElementById('d-clotures').textContent = clotures;
+
+  // Urgentes
+  const du = document.getElementById('d-urgent');
+  if (urgentes.length === 0) {
+    du.innerHTML = '<div class="empty" style="padding:22px;"><div style="font-size:28px;opacity:.4;margin-bottom:8px;">✓</div><div>Aucune action urgente</div></div>';
+  } else {
+    du.innerHTML = urgentes.slice(0,5).map(r => {
+      const d = daysDiff(r.date);
+      return `<div class="relance urgent" onclick="renderDetail('${r.sin.id}')">
+        <div class="r-dot" style="background:var(--red)"></div>
+        <div style="flex:1;">
+          <div style="font-size:13px;">${r.sin.propriete} · <strong>${r.acteur}</strong> — ${r.note||'Relance'}</div>
+          <div class="r-meta">
+            <span style="color:${d<0?'var(--red)':d===0?'var(--amber)':'var(--text-muted)'}">${d<0?'⚠️ En retard de '+Math.abs(d)+'j':d===0?"⚡ Aujourd'hui":'Dans '+d+'j'}</span>
+            <span>📱 ${r.moyen}</span>
+          </div>
+        </div>
+        <button class="btn btn-ghost btn-xs" onclick="event.stopPropagation();markDone('${r.sin.id}','${r.id}')">✓ Fait</button>
+      </div>`;
+    }).join('');
+  }
+
+  // Recent
+  const dr = document.getElementById('d-recent');
+  const rec = db.sinistres.slice(0,5);
+  if (rec.length === 0) {
+    dr.innerHTML = '<div class="empty" style="padding:30px;"><div class="empty-icon">📋</div><div>Aucun sinistre · <button class="btn btn-primary btn-sm" onclick="openNewSinistre()" style="margin-left:8px;">Créer</button></div></div>';
+    return;
+  }
+  dr.innerHTML = rec.map(s => sinRow(s)).join('');
+}
+
+// ====== SINISTRES LIST ======
+function sinRow(s) {
+  const urgents = (s.relances||[]).filter(r => !r.done && daysDiff(r.date) <= 3).length;
+  return `<div class="sin-row" onclick="renderDetail('${s.id}')">
+    <div class="sin-id">${s.id}</div>
+    <div>
+      <div class="sin-title">${s.propriete}${s.lot?' · '+s.lot:''}</div>
+      <div class="sin-desc">${(s.description||'').substring(0,70)}${(s.description||'').length>70?'…':''}</div>
+    </div>
+    <div class="sin-date">${fd(s.date)}</div>
+    <div style="font-size:12px;color:var(--text-muted);">👥 ${(s.acteurs||[]).length}</div>
+    <div><span class="status ${stClass(s.statut)}">${stLabel(s.statut)}</span></div>
+    <div>${urgents>0?`<span style="color:var(--red);font-size:11px;font-weight:600;">⚡ ${urgents}</span>`:''}</div>
+  </div>`;
+}
+
+function renderList() {
+  const search = (document.getElementById('search')?.value||'').toLowerCase();
+  let list = db.sinistres;
+  if (currentProp) list = list.filter(s => s.propriete === currentProp);
+  if (currentFilter !== 'tous') list = list.filter(s => s.statut === currentFilter);
+  if (search) list = list.filter(s =>
+    (s.description||'').toLowerCase().includes(search) ||
+    (s.propriete||'').toLowerCase().includes(search) ||
+    (s.lot||'').toLowerCase().includes(search) ||
+    (s.ndossier||'').toLowerCase().includes(search)
+  );
+  const el = document.getElementById('sin-list');
+  el.innerHTML = list.length === 0
+    ? `<div class="empty"><div class="empty-icon">📋</div><div class="empty-text">Aucun sinistre trouvé</div><button class="btn btn-primary" onclick="openNewSinistre()" style="margin-top:14px;">+ Nouveau sinistre</button></div>`
+    : list.map(sinRow).join('');
+}
+
+function setFilter(f, el) {
+  currentFilter = f;
+  document.querySelectorAll('.chip').forEach(c => c.classList.remove('on'));
+  el.classList.add('on');
+  renderList();
+}
+function filterProp(p) { currentProp = p; showView('sinistres'); }
+
+// ====== DETAIL ======
+async function renderDetail(id) {
+  currentSinistreId = id;
+  const s = db.sinistres.find(x => x.id === id);
+  if (!s) return;
+  showView('detail');
+
+  document.getElementById('dt-title').textContent = s.propriete + (s.lot?' · '+s.lot:'');
+  document.getElementById('dt-sub').textContent = s.id + ' · Déclaré le ' + fd(s.date);
+  document.getElementById('dt-status').innerHTML = `<span class="status ${stClass(s.statut)}">${stLabel(s.statut)}</span>`;
+  document.getElementById('tc-a').textContent = `(${(s.acteurs||[]).length})`;
+
+  // Reset to first tab
+  showTab('ti', document.querySelector('.tab'));
+
+  // INFOS
+  document.getElementById('tc-infos').innerHTML = `
+    <div class="info-grid" style="margin-bottom:14px;">
+      ${ib('📍 Propriété', s.propriete)}
+      ${ib('🚪 Lot', s.lot||'—')}
+      ${ib('📅 Déclaration', fd(s.date))}
+      ${ib('🔍 Origine', s.origine||'—')}
+      ${ib('⚖️ Responsabilité', s.responsabilite||'—')}
+      ${ib('📁 N° dossier', s.ndossier||'—')}
+      ${ib('💶 Montant estimé', s.montant?s.montant+' €':'—')}
+    </div>
+    <div style="background:var(--card);border:1px solid var(--border);border-radius:8px;padding:14px;font-size:13px;line-height:1.7;">${s.description||''}</div>`;
+
+  // ACTORS
+  const actHtml = (s.acteurs||[]).length === 0
+    ? '<div class="empty" style="padding:30px;"><div>Aucun acteur — <button class="btn btn-ghost btn-sm" onclick="openAddActeur(true)">Ajouter</button></div></div>'
+    : (s.acteurs||[]).map(a => `<div class="actor">
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+          <div class="actor-role" style="color:${roleColor(a.role)}">${a.role}</div>
+          <button onclick="delActeur('${s.id}','${a.id}')" style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:17px;line-height:1;">×</button>
+        </div>
+        <div class="actor-name">${a.nom}${a.contact?' · '+a.contact:''}</div>
+        ${a.tel?`<div class="actor-info">📞 ${a.tel}</div>`:''}
+        ${a.email?`<div class="actor-info">✉️ ${a.email}</div>`:''}
+        ${a.notes?`<div class="actor-info" style="font-style:italic;margin-top:5px;">${a.notes}</div>`:''}
+        <div class="actor-actions">
+          ${a.tel?`<a href="tel:${a.tel}" class="btn btn-ghost btn-sm">📞 Appeler</a>`:''}
+          ${a.email?`<a href="mailto:${a.email}" class="btn btn-ghost btn-sm">✉️ Email</a>`:''}
+          <button class="btn btn-ghost btn-sm" onclick="openRelanceFor('${a.nom}')">🔔 Relancer</button>
+        </div>
+      </div>`).join('');
+  document.getElementById('tc-actors').innerHTML = actHtml + `<button class="btn btn-ghost btn-sm" style="margin-top:10px;" onclick="openAddActeur(true)">+ Ajouter acteur</button>`;
+
+  // TIMELINE
+  const evts = [...(s.timeline||[])].sort((a,b) => b.date.localeCompare(a.date));
+  const tlHtml = evts.length === 0
+    ? '<div style="color:var(--text-muted);font-size:13px;">Aucun événement.</div>'
+    : `<div class="tl">${evts.map(e => `<div class="tl-item">
+        <div class="tl-dot ${e.type==='blocage'?'red':e.type==='relance'?'amber':''}"></div>
+        <div class="tl-date">${fd(e.date)} · ${e.type}</div>
+        <div class="tl-text">${e.description}</div>
+      </div>`).join('')}</div>`;
+  document.getElementById('tc-timeline').innerHTML = tlHtml + `<button class="btn btn-ghost btn-sm" style="margin-top:14px;" onclick="openEvent()">+ Ajouter événement</button>`;
+
+  // RELANCES
+  const rels = [...(s.relances||[])].sort((a,b) => a.date.localeCompare(b.date));
+  const rHtml = rels.length === 0
+    ? '<div style="color:var(--text-muted);font-size:13px;">Aucune relance.</div>'
+    : rels.map(r => {
+        const d = daysDiff(r.date);
+        return `<div class="relance ${!r.done&&d<=3?'urgent':''}">
+          <div class="r-dot" style="background:${r.done?'var(--green)':r.urgence==='haute'?'var(--red)':r.urgence==='moyenne'?'var(--amber)':'var(--green)'}"></div>
+          <div style="flex:1;">
+            <div style="font-size:13px;">${r.acteur} — ${r.note||'Relance'}</div>
+            <div class="r-meta">
+              <span>📅 ${fd(r.date)}</span><span>📱 ${r.moyen}</span>
+              ${!r.done&&d!==null?`<span style="color:${d<0?'var(--red)':d===0?'var(--amber)':'var(--text-muted)'}">${d<0?'⚠️ '+Math.abs(d)+'j retard':d===0?"⚡ Aujourd'hui":'Dans '+d+'j'}</span>`:''}
+            </div>
+          </div>
+          ${!r.done?`<button class="btn btn-ghost btn-xs" onclick="markDone('${s.id}','${r.id}')">✓ Fait</button>`:'<span style="color:var(--green);font-size:11px;font-weight:600;">✓ Fait</span>'}
+        </div>`;
+      }).join('');
+  document.getElementById('tc-relances').innerHTML = rHtml + `<button class="btn btn-ghost btn-sm" style="margin-top:10px;" onclick="openRelance()">+ Planifier relance</button>`;
+
+  // PROGRESS
+  const steps = [!!s.ndossier,(s.acteurs||[]).length>0,(s.timeline||[]).length>0,(s.relances||[]).length>0,s.statut==='cloture'];
+  const pct = Math.round(steps.filter(Boolean).length/steps.length*100);
+  document.getElementById('prg-pct').textContent = pct+'%';
+  document.getElementById('prg-bar').style.width = pct+'%';
+  document.getElementById('prg-checklist').innerHTML = [
+    ['N° dossier assurance',!!s.ndossier],['Acteurs identifiés',(s.acteurs||[]).length>0],
+    ['Historique renseigné',(s.timeline||[]).length>0],['Relances planifiées',(s.relances||[]).length>0],['Clôturé',s.statut==='cloture']
+  ].map(([l,ok]) => `<div style="display:flex;gap:7px;align-items:center;margin-bottom:7px;font-size:12px;">
+    <span style="color:${ok?'var(--green)':'var(--text-muted)'};">${ok?'✓':'○'}</span>
+    <span style="color:${ok?'var(--text)':'var(--text-muted)'};">${l}</span>
+  </div>`).join('');
+
+  // SUMMARY
+  const pendRel = (s.relances||[]).filter(r => !r.done).length;
+  document.getElementById('dt-summary').innerHTML = [
+    ['👥 Acteurs',(s.acteurs||[]).length+' impliqué(s)'],
+    ['🔔 Relances',pendRel+' en attente'],
+    ['📝 Événements',(s.timeline||[]).length+''],
+    ['📅 Créé le',fd(s.createdAt)],
+  ].map(([k,v]) => `<div style="display:flex;justify-content:space-between;font-size:12px;padding:7px 0;border-bottom:1px solid var(--border);">
+    <span style="color:var(--text-muted)">${k}</span><span>${v}</span>
+  </div>`).join('');
+}
+
+function ib(label, val) {
+  return `<div class="info-block"><div class="info-label">${label}</div><div class="info-val">${val}</div></div>`;
+}
+
+// ====== SINISTRE CRUD ======
+function openNewSinistre() {
+  editMode = false;
+  document.getElementById('ms-title').textContent = 'Nouveau sinistre';
+  ['ms-prop','ms-lot','ms-desc','ms-ndoss'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('ms-date').value = today();
+  document.getElementById('ms-statut').value = 'ouvert';
+  document.getElementById('ms-origine').value = '';
+  document.getElementById('ms-resp').value = '';
+  document.getElementById('ms-montant').value = '';
+  open('m-sinistre');
+}
+
+function openEditSinistre() {
+  const s = db.sinistres.find(x => x.id === currentSinistreId);
+  if (!s) return;
+  editMode = true;
+  document.getElementById('ms-title').textContent = 'Modifier le sinistre';
+  document.getElementById('ms-prop').value = s.propriete||'';
+  document.getElementById('ms-lot').value = s.lot||'';
+  document.getElementById('ms-desc').value = s.description||'';
+  document.getElementById('ms-date').value = s.date||'';
+  document.getElementById('ms-statut').value = s.statut||'ouvert';
+  document.getElementById('ms-origine').value = s.origine||'';
+  document.getElementById('ms-resp').value = s.responsabilite||'';
+  document.getElementById('ms-ndoss').value = s.ndossier||'';
+  document.getElementById('ms-montant').value = s.montant||'';
+  open('m-sinistre');
+}
+
+async function saveSinistre() {
+  const prop = document.getElementById('ms-prop').value;
+  const desc = document.getElementById('ms-desc').value;
+  if (!prop || !desc) { toast('Propriété et description obligatoires', true); return; }
+  const body = {
+    propriete: prop, description: desc,
+    lot: document.getElementById('ms-lot').value,
+    date: document.getElementById('ms-date').value,
+    statut: document.getElementById('ms-statut').value,
+    origine: document.getElementById('ms-origine').value,
+    responsabilite: document.getElementById('ms-resp').value,
+    ndossier: document.getElementById('ms-ndoss').value,
+    montant: document.getElementById('ms-montant').value,
+  };
+  try {
+    if (editMode) {
+      await api('PUT', '/sinistres/' + currentSinistreId, body);
+      toast('Sinistre mis à jour');
+    } else {
+      await api('POST', '/sinistres', body);
+      toast('Sinistre créé');
+    }
+    close('m-sinistre');
+    await loadAll();
+    if (editMode) renderDetail(currentSinistreId);
+  } catch(e) { toast(e.message, true); }
+}
+
+async function deleteSinistre() {
+  if (!confirm('Supprimer ce sinistre définitivement ?')) return;
+  await api('DELETE', '/sinistres/' + currentSinistreId);
+  toast('Sinistre supprimé');
+  await loadAll();
+  showView('sinistres');
+}
+
+// ====== ACTEURS ======
+function openAddActeur(toSinistre) {
+  addActeurToSinistre = toSinistre;
+  ['ma-role','ma-nom','ma-contact','ma-tel','ma-email','ma-notes'].forEach(id => document.getElementById(id).value = '');
+  open('m-acteur');
+}
+
+async function saveActeur() {
+  const role = document.getElementById('ma-role').value;
+  const nom = document.getElementById('ma-nom').value;
+  if (!role || !nom) { toast('Rôle et nom obligatoires', true); return; }
+  const body = { role, nom, contact: document.getElementById('ma-contact').value, tel: document.getElementById('ma-tel').value, email: document.getElementById('ma-email').value, notes: document.getElementById('ma-notes').value };
+  try {
+    if (addActeurToSinistre && currentSinistreId) {
+      await api('POST', '/sinistres/' + currentSinistreId + '/acteurs', body);
+    } else {
+      await api('POST', '/acteurs', body);
+    }
+    toast('Acteur ajouté');
+    close('m-acteur');
+    await loadAll();
+    if (addActeurToSinistre) renderDetail(currentSinistreId);
+    else renderAnnuaire();
+  } catch(e) { toast(e.message, true); }
+}
+
+async function delActeur(sid, aid) {
+  if (!confirm('Retirer cet acteur du sinistre ?')) return;
+  await api('DELETE', '/sinistres/' + sid + '/acteurs/' + aid);
+  await loadAll();
+  renderDetail(sid);
+  toast('Acteur retiré');
+}
+
+function renderAnnuaire() {
+  const all = [];
+  db.sinistres.forEach(s => (s.acteurs||[]).forEach(a => all.push({ ...a, sin: s.propriete + (s.lot?' · '+s.lot:'') })));
+  const el = document.getElementById('annuaire-list');
+  if (all.length === 0) {
+    el.innerHTML = '<div class="empty"><div class="empty-icon">👥</div><div class="empty-text">Aucun acteur enregistré</div></div>';
+    return;
+  }
+  el.innerHTML = all.map(a => `<div class="actor">
+    <div class="actor-role" style="color:${roleColor(a.role)}">${a.role}</div>
+    <div class="actor-name">${a.nom}${a.contact?' · '+a.contact:''}</div>
+    ${a.tel?`<div class="actor-info">📞 ${a.tel}</div>`:''}
+    ${a.email?`<div class="actor-info">✉️ ${a.email}</div>`:''}
+    <div class="actor-info" style="color:var(--teal);margin-top:6px;font-size:11px;">📋 ${a.sin}</div>
+    <div class="actor-actions" style="margin-top:8px;">
+      ${a.tel?`<a href="tel:${a.tel}" class="btn btn-ghost btn-sm">📞</a>`:''}
+      ${a.email?`<a href="mailto:${a.email}" class="btn btn-ghost btn-sm">✉️</a>`:''}
+    </div>
+  </div>`).join('');
+}
+
+// ====== EVENTS & RELANCES ======
+function openEvent() {
+  document.getElementById('me-date').value = today();
+  document.getElementById('me-desc').value = '';
+  open('m-event');
+}
+async function saveEvent() {
+  const date = document.getElementById('me-date').value;
+  const desc = document.getElementById('me-desc').value;
+  if (!date || !desc) { toast('Date et description obligatoires', true); return; }
+  await api('POST', '/sinistres/' + currentSinistreId + '/timeline', { date, type: document.getElementById('me-type').value, description: desc });
+  close('m-event'); await loadAll(); renderDetail(currentSinistreId); toast('Événement ajouté');
+}
+
+function openRelance() { document.getElementById('mr-acteur').value=''; document.getElementById('mr-date').value=today(); document.getElementById('mr-note').value=''; open('m-relance'); }
+function openRelanceFor(nom) { document.getElementById('mr-acteur').value=nom; document.getElementById('mr-date').value=today(); open('m-relance'); }
+async function saveRelance() {
+  const acteur = document.getElementById('mr-acteur').value;
+  const date = document.getElementById('mr-date').value;
+  if (!acteur||!date) { toast('Acteur et date obligatoires', true); return; }
+  await api('POST', '/sinistres/'+currentSinistreId+'/relances', { acteur, date, urgence: document.getElementById('mr-urgence').value, moyen: document.getElementById('mr-moyen').value, note: document.getElementById('mr-note').value });
+  close('m-relance'); await loadAll(); renderDetail(currentSinistreId); toast('Relance planifiée');
+}
+
+async function markDone(sid, rid) {
+  await api('PATCH', '/sinistres/'+sid+'/relances/'+rid, { done: true });
+  await loadAll();
+  if (currentSinistreId === sid) renderDetail(sid);
+  if (document.getElementById('view-relances').classList.contains('active')) renderRelancesView();
+  if (document.getElementById('view-dashboard').classList.contains('active')) renderDashboard();
+  toast('Relance marquée comme faite');
+}
+
+// ====== RELANCES VIEW ======
+function renderRelancesView() {
+  const all = [];
+  db.sinistres.forEach(s => (s.relances||[]).filter(r => !r.done).forEach(r => all.push({ ...r, sin: s })));
+  all.sort((a,b) => a.date.localeCompare(b.date));
+  const el = document.getElementById('relances-view');
+  if (all.length === 0) {
+    el.innerHTML = '<div class="empty"><div class="empty-icon">🎉</div><div class="empty-text">Aucune relance en attente — tout est à jour !</div></div>';
+    return;
+  }
+  const groups = { retard:[], auj:[], sem:[], plus:[] };
+  all.forEach(r => {
+    const d = daysDiff(r.date);
+    if (d<0) groups.retard.push(r);
+    else if (d===0) groups.auj.push(r);
+    else if (d<=7) groups.sem.push(r);
+    else groups.plus.push(r);
+  });
+  let html = '';
+  const grp = (title, list, color) => {
+    if (!list.length) return '';
+    return `<div style="font-weight:600;font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:${color};margin:16px 0 8px;">${title} (${list.length})</div>`
+      + list.map(r => `<div class="relance urgent" onclick="renderDetail('${r.sin.id}')">
+        <div class="r-dot" style="background:${r.urgence==='haute'?'var(--red)':r.urgence==='moyenne'?'var(--amber)':'var(--green)'}"></div>
+        <div style="flex:1;">
+          <div style="font-size:13px;"><strong>${r.acteur}</strong> — ${r.note||'Relance'}</div>
+          <div class="r-meta"><span>📋 ${r.sin.propriete}</span><span>📱 ${r.moyen}</span><span>📅 ${fd(r.date)}</span></div>
+        </div>
+        <button class="btn btn-ghost btn-xs" onclick="event.stopPropagation();markDone('${r.sin.id}','${r.id}')">✓ Fait</button>
+      </div>`).join('');
+  };
+  html += grp('⚠️ En retard', groups.retard, 'var(--red)');
+  html += grp("⚡ Aujourd'hui", groups.auj, 'var(--amber)');
+  html += grp('📅 Cette semaine', groups.sem, 'var(--teal)');
+  html += grp('📆 Plus tard', groups.plus, 'var(--text-muted)');
+  el.innerHTML = html;
+}
+
+// ====== MODÈLES ======
+const MODELES = [
+  { icon:'📨', titre:'Déclaration de sinistre', desc:"Lettre de déclaration initiale à votre assureur",
+    body:`Madame, Monsieur,
+
+Par la présente, je vous déclare un sinistre dégât des eaux survenu le [DATE] dans mon bien situé au [ADRESSE].
+
+Nature des dégâts : [DESCRIPTION]
+Origine présumée : [ORIGINE]
+
+Je vous transmets ci-joint les premières constatations et vous demande de bien vouloir mandater un expert dans les meilleurs délais.
+
+Dans l'attente, je vous prie d'agréer l'expression de mes sincères salutations.
+
+[NOM PRÉNOM]` },
+  { icon:'⏰', titre:'Relance assureur (délai)', desc:"Rappel suite à absence de réponse de l'assureur",
+    body:`Madame, Monsieur,
+
+Sauf erreur de ma part, je n'ai reçu aucune réponse de votre part concernant mon dossier sinistre n°[NUMÉRO] déclaré le [DATE].
+
+Je vous rappelle que la réglementation impose un délai de traitement raisonnable. Je vous demande de bien vouloir m'indiquer l'état d'avancement de mon dossier dans un délai de 8 jours.
+
+À défaut, je me verrai contraint(e) de saisir le médiateur de l'assurance.
+
+Cordialement,
+[NOM PRÉNOM]` },
+  { icon:'⚖️', titre:'Mise en demeure responsable', desc:'Lettre recommandée au voisin ou copropriétaire responsable',
+    body:`Madame, Monsieur,
+
+Je me permets de vous contacter suite au dégât des eaux causé par votre appartement situé au [ADRESSE RESPONSABLE] ayant occasionné des dommages dans mon bien le [DATE].
+
+Malgré ma/mes demande(s) précédente(s), aucune réparation n'a été effectuée et/ou aucune indemnisation ne m'a été proposée.
+
+Je vous mets en demeure, par le présent courrier, de procéder aux réparations nécessaires et/ou de contacter votre assureur sous 15 jours.
+
+Passé ce délai, je me réserve le droit d'engager toute procédure utile.
+
+Cordialement,
+[NOM PRÉNOM]` },
+  { icon:'🔧', titre:'Demande devis artisan', desc:'Demande de devis pour les travaux de réfection',
+    body:`Madame, Monsieur,
+
+Suite à un dégât des eaux survenu le [DATE] dans mon appartement au [ADRESSE], je souhaite faire réaliser les travaux de remise en état suivants :
+
+- [TRAVAUX 1]
+- [TRAVAUX 2]
+- [TRAVAUX 3]
+
+Je vous serais reconnaissant(e) de bien vouloir me faire parvenir votre devis détaillé dans les meilleurs délais, ce document devant être transmis à mon assureur.
+
+Cordialement,
+[NOM PRÉNOM]` },
+  { icon:'🏢', titre:'Information syndic', desc:'Signalement au syndic de copropriété',
+    body:`Madame, Monsieur le Syndic,
+
+Je vous informe d'un dégât des eaux affectant mon lot n°[NUMÉRO LOT] situé au [ADRESSE], survenu le [DATE].
+
+Nature et localisation des dégâts : [DESCRIPTION]
+Origine supposée : [PARTIES COMMUNES / VOISIN]
+
+Je vous demande de :
+1. Mandater un plombier pour identifier et stopper la fuite
+2. Déclarer le sinistre auprès de l'assurance de la copropriété
+3. Organiser la réunion de constat nécessaire
+
+Dans l'attente, je reste disponible pour tout renseignement complémentaire.
+
+Cordialement,
+[NOM PRÉNOM]` },
+  { icon:'🤝', titre:'Accord à l\'amiable', desc:'Proposition de règlement amiable entre parties',
+    body:`Madame, Monsieur,
+
+Afin d'éviter une procédure longue et coûteuse, je vous propose un règlement amiable du litige relatif au dégât des eaux du [DATE] causé dans mon bien au [ADRESSE].
+
+Les dommages constatés et chiffrés s'élèvent à [MONTANT] €, selon devis/rapport d'expertise joint.
+
+Je vous propose de vous acquitter de la somme de [MONTANT PROPOSÉ] € dans un délai de 30 jours à compter de la présente.
+
+En cas d'accord, veuillez me le confirmer par retour de courrier ou par email.
+
+Cordialement,
+[NOM PRÉNOM]` },
+];
+
+function renderModeles() {
+  document.getElementById('modeles-list').innerHTML = MODELES.map((m,i) => `
+    <div class="modele-card" onclick="openModele(${i})">
+      <div class="modele-icon">${m.icon}</div>
+      <div class="modele-title">${m.titre}</div>
+      <div class="modele-desc">${m.desc}</div>
+      <button class="btn btn-ghost btn-sm">📋 Voir le modèle</button>
+    </div>`).join('');
+}
+
+function openModele(i) {
+  const m = MODELES[i];
+  document.getElementById('mm-title').textContent = m.icon + ' ' + m.titre;
+  document.getElementById('mm-body').textContent = m.body;
+  currentModeleText = m.body;
+  open('m-modele');
+}
+function copyModele() {
+  navigator.clipboard.writeText(currentModeleText).then(() => { toast('Modèle copié !'); close('m-modele'); });
+}
+
+// ====== EXPORT ======
+function exportData() {
+  window.open('/api/export', '_blank');
+}
+
+// ====== INIT ======
+async function init() {
+  await loadAll();
+  renderModeles();
+  document.getElementById('loader').style.opacity = '0';
+  setTimeout(() => document.getElementById('loader').style.display = 'none', 400);
+}
+
+init();
+</script>
+</body>
+</html>
